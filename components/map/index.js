@@ -59,7 +59,8 @@ const StaticProps: Array<string> = [
   'viewMode',
   'pitchEnable',
   'buildingAnimation',
-  'skyColor'
+  'skyColor',
+  'mask'
 ]
 
 const CreateProps = NativeDynamicProps.concat(StatusDynamicProps, StaticProps)
@@ -127,14 +128,17 @@ class BaseMap extends Component<MapProps, {mapLoaded: boolean}> {
         useAMapUI: props.useAMapUI,
         version: props.version,
         protocol: props.protocol
-      }).load().then(() => {
-        this.createInstance()
-        if (!this.state.mapLoaded) {
-          this.setState({
-            mapLoaded: true
-          })
-        }
       })
+        .load()
+        .then(() => this.getAreaMask())
+        .then((res) => {
+          this.createInstance(res)
+          if (!this.state.mapLoaded) {
+            this.setState({
+              mapLoaded: true
+            })
+          }
+        })
     }
   }
 
@@ -167,9 +171,9 @@ class BaseMap extends Component<MapProps, {mapLoaded: boolean}> {
     })
   }
 
-  createInstance() {
+  createInstance(res) {
     if (!this.map) {
-      const options = this.buildCreateOptions()
+      const options = this.buildCreateOptions(res)
       this.map = new window.AMap.Map(this.mapWrapper, options)
       // install map plugins
       this.setPlugins(this.props)
@@ -177,7 +181,41 @@ class BaseMap extends Component<MapProps, {mapLoaded: boolean}> {
     }
   }
 
-  buildCreateOptions() {
+  getAreaMask() {
+    const district = new window.AMap.DistrictSearch({
+      subdistrict: 0,
+      extensions: 'all',
+      level: 'province'
+    });
+    return new Promise(resolve => {
+      // 利用行政区查询获取边界构建mask路径
+      // 也可以直接通过经纬度构建mask路径
+      if (!this.props.maskName) {
+        resolve({})
+        return;
+      }
+      district.search(this.props.maskName, function(status, result) {
+        if (status === 'complete') {
+          const center = result.districtList[0].center;
+          const bounds = result.districtList[0].boundaries;
+          const mask = [];
+          for (let i = 0; i < bounds.length; i += 1) {
+            mask.push([bounds[i]]);
+          }
+          resolve({
+            mask: mask,
+            center: center,
+            pitch: 0,
+            maxPitch: 0
+          })
+        } else {
+          resolve()
+        }
+      });
+    })
+  }
+
+  buildCreateOptions(res) {
     const props = this.props
     const options = {}
     CreateProps.forEach((key) => {
@@ -185,7 +223,7 @@ class BaseMap extends Component<MapProps, {mapLoaded: boolean}> {
         options[key] = this.getSetterValue(key, props)
       }
     })
-    return options
+    return {...options, ...res}
   }
 
   updateMapProps(prevProps: MapProps, nextProps: MapProps) {

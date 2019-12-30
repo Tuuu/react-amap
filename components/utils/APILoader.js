@@ -29,7 +29,7 @@ export default class APILoader {
   }
 
   getScriptSrc(cfg) {
-    return `${this.protocol}//${cfg.hostAndPath}?v=${cfg.v}&key=${cfg.key}&callback=${cfg.callback}`
+    return `${this.protocol}//${cfg.hostAndPath}?v=${cfg.v}&key=${cfg.key}&plugin=AMap.DistrictSearch&callback=${cfg.callback}`
   }
 
   buildScriptTag(src) {
